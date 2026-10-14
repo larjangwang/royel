@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ระบบนำเสนอวีดีโอจำลองการเดินถวายดอกไม้จันทน์ (แถวตอนเรียง 4)</title>
+  <style>
+    :root {
+      --bg-dark: #0b1120;
+      --bg-panel: #151f32;
+      --bg-card: #1e293b;
+      --gold: #facc15;
+      --gold-light: #fef08a;
+      --gold-dark: #ca8a04;
+      --red: #dc2626;
+      --text-main: #f8fafc;
+      --text-muted: #cbd5e1;
+      --border: #334155;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at top, #172554 0%, #0b1120 65%);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background: rgba(11, 17, 32, 0.95);
+      border-bottom: 3px solid var(--gold);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .brand > div:last-child {
+      min-width: 0;
+    }
+    .brand-bar {
+      flex-shrink: 0;
+      width: 8px;
+      height: 48px;
+      background: linear-gradient(180deg, var(--gold-light), var(--gold-dark));
+      border-radius: 4px;
+    }
+    .brand h1 {
+      font-size: 1.38rem;
+      color: var(--gold-light);
+      letter-spacing: 0.2px;
+    }
+    .brand p {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      background: var(--bg-card);
+      color: var(--text-main);
+      border: 1.5px solid var(--border);
+      padding: 9px 16px;
+      border-radius: 8px;
+      font-size: 0.92rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      max-width: 100%;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+    .btn:hover {
+      border-color: var(--gold);
+      background: #26354d;
+    }
+    .btn.active {
+      background: linear-gradient(135deg, #991b1b, #dc2626);
+      border-color: var(--gold);
+      color: #fff;
+      box-shadow: 0 0 14px rgba(220, 38, 38, 0.45);
+    }
+    .btn-gold {
+      background: linear-gradient(135deg, #ca8a04, #eab308);
+      color: #0f172a;
+      border-color: var(--gold-light);
+      font-weight: 700;
+    }
+    .btn-gold:hover {
+      background: linear-gradient(135deg, #eab308, #facc15);
+      color: #000;
+    }
+    main {
+      flex: 1;
+      max-width: 1720px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 18px 24px 28px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 370px;
+      gap: 20px;
+    }
+    @media (max-width: 1200px) {
+      main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+    .stage-card {
+      min-width: 0;
+      background: var(--bg-panel);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+    }
+    .stage-toolbar {
+      padding: 12px 18px;
+      background: rgba(15, 23, 42, 0.9);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .chapter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+    }
+    .viewport-wrap {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    video {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+    }
+    .panel-box {
+      background: var(--bg-panel);
+      border: 1.5px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+    .panel-box h2 {
+      font-size: 1.08rem;
+      color: var(--gold);
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .step-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .step-item {
+      background: var(--bg-card);
+      border-left: 4px solid var(--gold);
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.15s ease;
+    }
+    .step-item:hover {
+      background: #283548;
+      transform: translateX(3px);
+    }
+    .step-item.step-red {
+      border-left-color: var(--red);
+    }
+    .step-item .step-title {
+      font-weight: 700;
+      color: var(--gold-light);
+      font-size: 0.94rem;
+      margin-bottom: 4px;
+    }
+    .step-item .step-desc {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+    .thumb-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .thumb-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .thumb-card:hover {
+      border-color: var(--gold);
+      transform: translateY(-2px);
+    }
+    .thumb-card img {
+      width: 100%;
+      height: 86px;
+      object-fit: cover;
+      display: block;
+    }
+    .thumb-card span {
+      display: block;
+      padding: 6px 8px;
+      font-size: 0.78rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.88);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 24px;
+    }
+    .modal.open {
+      display: flex;
+    }
+    .modal-content {
+      max-width: 92vw;
+      max-height: 90vh;
+      background: var(--bg-panel);
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #0f172a;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 {
+      color: var(--gold-light);
+      font-size: 1rem;
+    }
+    .modal-body img {
+      max-width: 90vw;
+      max-height: 80vh;
+      object-fit: contain;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <div class="brand-bar"></div>
+      <div>
+        <h1>วีดีโอจำลองแนวการเดินไปถวายดอกไม้จันทน์ (แถวตอนเรียง 4)</h1>
+        <p>จำลองการเดินจากเต็นท์โดมผู้ร่วมพิธี ตามแนวลูกศรสีแดง ขึ้นวางดอกไม้จันทน์ที่พานพุ่มหน้าซุ้มฯ (ผังบริเวณงานใหม่)</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" onclick="toggleFullscreen()">ขยายเต็มจอ (Fullscreen สำหรับนำเสนอ)</button>
+      <a class="btn btn-gold" href="วีดีโอจำลองการเดินถวายดอกไม้จันทน์.mp4?v=route-new-20261014" download="วีดีโอจำลองการเดินถวายดอกไม้จันทน์.mp4">
+        ดาวน์โหลดไฟล์วีดีโอ (.MP4)
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <div class="stage-card" id="presentationStage">
+      <div class="stage-toolbar">
+        <div class="chapter-group">
+          <button class="btn active" id="chap1" onclick="jumpToChapter(0, 'chap1')">
+            1. ผังรวมและแนวเดิน (0:00)
+          </button>
+          <button class="btn" id="chap2" onclick="jumpToChapter(16.1, 'chap2')">
+            2. มุมสูง 3 มิติ (0:16)
+          </button>
+          <button class="btn" id="chap3" onclick="jumpToChapter(30.1, 'chap3')">
+            3. ทางเดินกลาง แถวตอนเรียง 4 (0:30)
+          </button>
+          <button class="btn" id="chap4" onclick="jumpToChapter(44.1, 'chap4')">
+            4. จำลองการวางที่พานพุ่มหน้าซุ้มฯ (0:44)
+          </button>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center;">
+          <span style="font-size:0.85rem; color:var(--text-muted);">ความเร็ว:</span>
+          <button class="btn" onclick="setSpeed(0.75)">0.75x</button>
+          <button class="btn" onclick="setSpeed(1.0)">1.0x</button>
+          <button class="btn" onclick="setSpeed(1.5)">1.5x</button>
+        </div>
+      </div>
+
+      <div class="viewport-wrap">
+        <video id="simVideo" controls autoplay loop playsinline poster="pic/_preview_s2.png?v=route-new-20261014">
+          <source src="simulation_video.mp4?v=route-new-20261014" type="video/mp4" />
+          เบราว์เซอร์ของคุณไม่รองรับการเล่นวีดีโอ HTML5
+        </video>
+      </div>
+    </div>
+
+    <aside class="side-panel">
+      <div class="panel-box">
+        <h2>ลำดับขั้นตอนการเดิน (คลิกเพื่อข้ามไปดูแต่ละช่วง)</h2>
+        <div class="step-list">
+          <div class="step-item" onclick="jumpToChapter(0, 'chap1')">
+            <div class="step-title">ขั้นที่ 1 : เข้าจุดคัดกรอง & นั่งพักในเต็นท์โดม (4 หลัง)</div>
+            <div class="step-desc">ประชาชนผ่านจุดคัดกรองด้านหลัง เดินเข้าสู่อาคารเต็นท์โดมขนาด 22x36 ม. จำนวน 4 หลัง เพื่อนั่งรอตามลำดับแถว</div>
+          </div>
+          <div class="step-item step-red" onclick="jumpToChapter(6.0, 'chap1')">
+            <div class="step-title">ขั้นที่ 2 : เดินออกจากเต็นท์ ตั้งแถวตอนเรียง 4</div>
+            <div class="step-desc">เจ้าหน้าที่เชิญประชาชนลุกจากเต็นท์โดมทีละแถว (แถวละ 4 คน) เดินเลียบหน้าเต็นท์ไปรวมแถวที่มุมด้านซ้าย แล้วเลี้ยวเข้าสู่ทางเดินกลางตามแนวลูกศรสีแดง</div>
+          </div>
+          <div class="step-item step-red" onclick="jumpToChapter(30.1, 'chap3')">
+            <div class="step-title">ขั้นที่ 3 : เดินตามทางเดินกลาง & แยกอ้อมวงเวียน</div>
+            <div class="step-desc">แถวตอนเรียง 4 เดินมุ่งหน้าสู่ซุ้มฯ เมื่อถึงวงเวียนกลางทางเดิน แถวซ้าย 2 แถวแยกอ้อมซ้าย แถวขวา 2 แถวแยกอ้อมขวา แล้วรวมกลับเป็นแถวตอนเรียง 4</div>
+          </div>
+          <div class="step-item" onclick="jumpToChapter(44.1, 'chap4')">
+            <div class="step-title">ขั้นที่ 4 : ถวายดอกไม้จันทน์ที่พานพุ่ม (ครั้งละ 4 คน)</div>
+            <div class="step-desc">เมื่อถึงหน้าซุ้มถวายดอกไม้จันทน์ ประชาชนแถวหน้าสุด 4 คน ก้าวขึ้นทำความเคารพและวางดอกไม้จันทน์บนพานพุ่มพร้อมกัน</div>
+          </div>
+          <div class="step-item step-red" onclick="jumpToChapter(47.2, 'chap4')">
+            <div class="step-title">ขั้นที่ 5 : ออกด้านซ้ายของซุ้ม วนเลียบขอบเวทีและแนวด้านหน้า</div>
+            <div class="step-desc">หลังจากวางดอกไม้จันทน์แล้ว เดินออกทางด้านซ้ายของซุ้มฯ วนเลียบขอบเวทีไปยังมุมบริเวณด้านขวา แล้วเดินเลียบแนวด้านหน้างานกลับไปยังทางออกด้านซ้ายตามภาพเส้นทางใหม่</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel-box">
+        <h2>ภาพผังและแบบ 3 มิติอ้างอิง (คลิกเพื่อดูภาพขยาย)</h2>
+        <div class="thumb-grid">
+          <div class="thumb-card" onclick="openModal('pic/plan_clean.png', 'ผังบริเวณงาน (จากไฟล์ PDF ผังงานซุ้มถวายดอกไม้จันทน์)')">
+            <img src="pic/plan_clean.png" alt="ผังบริเวณงาน" />
+            <span>ผังบริเวณงาน (PDF Plan)</span>
+          </div>
+          <div class="thumb-card" onclick="openModal('pic/1791968559674.jpg', 'ผังองค์ประกอบบริเวณงาน 9 จุดหลัก')">
+            <img src="pic/1791968559674.jpg" alt="องค์ประกอบ 9 จุด" />
+            <span>ผังจุดสำคัญ 1-9</span>
+          </div>
+          <div class="thumb-card" onclick="openModal('pic/B-01.png', 'มุมมอง 3 มิติ ภาพรวมบริเวณงาน (B-01)')">
+            <img src="pic/B-01.png" alt="B-01" />
+            <span>มุมมอง 3 มิติ (B-01)</span>
+          </div>
+          <div class="thumb-card" onclick="openModal('pic/walking_route_new.jpg', 'ภาพเส้นทางเดินใหม่ (อ้างอิงการปรับเส้นทาง)')">
+            <img src="pic/walking_route_new.jpg" alt="เส้นทางเดินใหม่" />
+            <span>เส้นทางใหม่ — ปรับเส้นทางตามภาพใหม่</span>
+          </div>
+          <div class="thumb-card" onclick="openModal('pic/B-13.png', 'มุมมอง 3 มิติ แนวแกนทางเดินกลาง (B-13)')">
+            <img src="pic/B-13.png" alt="B-13" />
+            <span>ทางเดินกลาง (B-13)</span>
+          </div>
+          <div class="thumb-card" onclick="openModal('pic/B-06.png', 'มุมมองหน้าซุ้มถวายดอกไม้จันทน์ (B-06)')">
+            <img src="pic/B-06.png" alt="B-06" />
+            <span>หน้าซุ้มฯ และพานพุ่ม (B-06)</span>
+          </div>
+          <div class="thumb-card" onclick="openModal('pic/1791968512941.jpg', 'แบบซุ้มถวายดอกไม้จันทน์ขนาดกลาง และพานพุ่ม')">
+            <img src="pic/1791968512941.jpg" alt="ซุ้มถวายดอกไม้จันทน์" />
+            <span>แบบซุ้มฯ และพานพุ่ม</span>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="modal" id="imgModal" onclick="closeModal()">
+    <div class="modal-content" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <h3 id="modalTitle">ภาพขยาย</h3>
+        <button class="btn" onclick="closeModal()">ปิด (ESC)</button>
+      </div>
+      <div class="modal-body">
+        <img id="modalImg" src="" alt="Preview" />
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById('simVideo');
+    const chapBtns = ['chap1', 'chap2', 'chap3', 'chap4'];
+
+    function jumpToChapter(seconds, btnId) {
+      video.currentTime = seconds;
+      video.play().catch(() => {});
+      updateActiveButton(btnId);
+    }
+
+    function updateActiveButton(activeId) {
+      chapBtns.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', id === activeId);
+      });
+    }
+
+    video.addEventListener('timeupdate', () => {
+      const t = video.currentTime;
+      if (t < 16.0) updateActiveButton('chap1');
+      else if (t < 30.0) updateActiveButton('chap2');
+      else if (t < 44.0) updateActiveButton('chap3');
+      else updateActiveButton('chap4');
+    });
+
+    function setSpeed(rate) {
+      video.playbackRate = rate;
+    }
+
+    function toggleFullscreen() {
+      const stage = document.getElementById('presentationStage');
+      if (!document.fullscreenElement) {
+        stage.requestFullscreen().catch(() => video.requestFullscreen());
+      } else {
+        document.exitFullscreen();
+      }
+    }
+
+    function openModal(src, title) {
+      document.getElementById('modalImg').src = src;
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('imgModal').classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('imgModal').classList.remove('open');
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+  </script>
+</body>
+</html>

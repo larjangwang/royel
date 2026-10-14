@@ -1,0 +1,9 @@
+.devin/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+simulation_video.pending.mp4
