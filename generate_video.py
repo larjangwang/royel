@@ -5,6 +5,8 @@ import subprocess
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
+from human_renderer import draw_human
+
 BASE_DIR = r"C:\xampp\htdocs\royal"
 PIC_DIR = os.path.join(BASE_DIR, "pic")
 FONT_REG = r"C:\Windows\Fonts\tahoma.ttf"
@@ -12,6 +14,9 @@ FONT_BOLD = r"C:\Windows\Fonts\tahomabd.ttf"
 
 W, H = 1920, 1080
 FPS = 30
+# Scene lengths in seconds: S1 plan [0,10), S2 iso [10,18), S3 axial [18,28), S4 close [28,40)
+SCENE_DURATIONS = (10.0, 8.0, 10.0, 12.0)
+TOTAL_DURATION = sum(SCENE_DURATIONS)
 
 def get_font(size, bold=False):
     return ImageFont.truetype(FONT_BOLD if bold else FONT_REG, size)
@@ -117,55 +122,21 @@ def draw_top_header(draw, title, subtitle, scene_badge, progress=0.0):
     draw.rectangle([0, H - 8, W, H], fill=(30, 41, 59, 220))
     draw.rectangle([0, H - 8, int(W * progress), H], fill=(250, 204, 21, 255))
 
-def draw_person_topdown(draw, x, y, radius=5.5, holding_flower=True, is_seated=False, highlight=False):
-    x, y = float(x), float(y)
-    if is_seated:
-        # Seated person in tent: dark mourning attire with subtle cyan/white outline
-        r = radius * 0.85
-        draw.ellipse([x - r - 1, y - r - 1, x + r + 1, y + r + 1], fill=(148, 163, 184, 220))
-        draw.ellipse([x - r, y - r, x + r, y + r], fill=(30, 41, 59, 255))
-        return
-    # Shoulders / body
-    sr = radius * 1.25
-    outline_col = (250, 204, 21, 255) if highlight else (255, 255, 255, 235)
-    body_col = (15, 23, 42, 255)
-    draw.ellipse([x - sr, y - sr, x + sr, y + sr], fill=body_col, outline=outline_col, width=2)
-    # Head
-    hr = radius * 0.65
-    draw.ellipse([x - hr, y - hr, x + hr, y + hr], fill=(226, 232, 240, 255))
-    # Sandalwood flower (golden dot in front)
-    if holding_flower:
-        fr = max(2.2, radius * 0.48)
-        draw.ellipse([x + sr * 0.45 - fr, y - fr, x + sr * 0.45 + fr, y + fr], fill=(250, 204, 21, 255), outline=(180, 83, 9, 255), width=1)
+def draw_person_topdown(canvas, x, y, radius=5.5, holding_flower=True, is_seated=False,
+                        highlight=False, heading=(0.0, -1.0), person_id=0, phase=0.0):
+    # Top-down plan view person; (x, y) stays the ground foot anchor
+    state = "seated" if is_seated else ("offering" if highlight else "walking")
+    draw_human(canvas, x, y, radius * 4.4, heading=heading, phase=phase, state=state,
+               person_id=person_id, holding_flower=holding_flower, camera="topdown",
+               offer_progress=0.7 if highlight else 0.0)
 
-def draw_person_3d_iso(draw, x, y, scale=1.0, holding_flower=True, facing_dir=(1.0, -0.5), bowing=False):
-    x, y = float(x), float(y)
-    h_body = 14.0 * scale
-    w_body = 7.5 * scale
-    r_head = 4.2 * scale
-    # Shadow
-    draw.ellipse([x - w_body, y - 3*scale, x + w_body, y + 4*scale], fill=(0, 0, 0, 110))
-    # Legs
-    draw.line([(x - 2*scale, y), (x - 2*scale, y - 5*scale)], fill=(20, 20, 30, 255), width=max(1, int(2*scale)))
-    draw.line([(x + 2*scale, y), (x + 2*scale, y - 5*scale)], fill=(20, 20, 30, 255), width=max(1, int(2*scale)))
-    # Torso (Black mourning attire with white collar accent)
-    bow_dy = 3.0 * scale if bowing else 0.0
-    torso_top = y - 5*scale - h_body + bow_dy
-    torso_bot = y - 4*scale
-    draw.rounded_rectangle([x - w_body*0.65, torso_top, x + w_body*0.65, torso_bot], radius=max(2, int(3*scale)),
-                           fill=(17, 24, 39, 255), outline=(255, 255, 255, 220), width=max(1, int(1.3*scale)))
-    # Head
-    head_y = torso_top - r_head * 0.9 + (1.5*scale if bowing else 0.0)
-    draw.ellipse([x - r_head, head_y - r_head, x + r_head, head_y + r_head],
-                 fill=(245, 222, 195, 255), outline=(15, 23, 42, 255), width=max(1, int(1.2*scale)))
-    # Hair
-    draw.pieslice([x - r_head, head_y - r_head, x + r_head, head_y + r_head], 180, 360, fill=(20, 20, 25, 255))
-    # Golden sandalwood flower (ดอกไม้จันทน์)
-    if holding_flower:
-        fx = x + facing_dir[0] * (5.5 * scale)
-        fy = torso_top + h_body * 0.45 + facing_dir[1] * (3.0 * scale)
-        fr = max(2.5, 3.6 * scale)
-        draw.ellipse([fx - fr, fy - fr, fx + fr, fy + fr], fill=(250, 204, 21, 255), outline=(217, 119, 6, 255), width=1)
+def draw_person_3d_iso(canvas, x, y, scale=1.0, holding_flower=True, facing_dir=(1.0, -0.5),
+                       bowing=False, person_id=0, phase=0.0, state=None):
+    # Isometric person; heading follows the actual path tangent so bodies really turn
+    st = state or ("offering" if bowing else "walking")
+    draw_human(canvas, x, y, 28.0 * scale, heading=facing_dir, phase=phase, state=st,
+               person_id=person_id, holding_flower=holding_flower, camera="iso",
+               offer_progress=0.6 if bowing else 0.0)
 
 # ==============================================================================
 # SCENE 1: 2D Architectural Plan from PDF (plan_clean.png) + Red Arrow + 4-Abreast
@@ -217,9 +188,10 @@ class Scene1Plan:
         self.main_total = self.prefix_path.total_length + self.branch_len + self.suffix_path.total_length
         # Lane-position continuity corrections at the branch boundaries (computed for 4 lanes)
         self._branch_start_fix, self._branch_end_fix = self._compute_branch_fixes(9.0, 4.0)
-        # Exit route: LEFT of the pavilion, around the stage edge and along the front boundary to the left exit
+        # Exit route: LEFT of the pavilion, around the stage edge and along the front boundary to the left exit.
+        # Left relative to facing the pavilion is north in the plan; do not step back onto approach.
         self.exit_pts = [tr(x, y) for x, y in [
-            (1552, 763), (1470, 735), (1470, 643), (1675, 643), (1675, 1045),
+            (1552, 763), (1552, 700), (1552, 643), (1675, 643), (1675, 1045),
             (540, 1045), (490, 1100), (490, 310), (380, 310)
         ]]
         self.exit_path = PolylinePath(self.exit_pts)
@@ -328,16 +300,19 @@ class Scene1Plan:
                 rev_idx = len(self.dome_rows_y) - 1 - row_idx
                 if rev_idx < rows_walked_out:
                     continue
-                for sub_x in (-12, -4, 4, 12):
+                for sub_i, sub_x in enumerate((-12, -4, 4, 12)):
                     px, py = self.tr(cx + sub_x, ry)
-                    draw_person_topdown(draw, px, py, radius=3.5, holding_flower=False, is_seated=True)
+                    draw_person_topdown(overlay, px, py, radius=3.5, holding_flower=False, is_seated=True,
+                                        person_id=col_idx * 100 + row_idx * 4 + sub_i)
 
         # Draw people walking along the rear entry path (จุดคัดกรอง -> เต็นท์โดม)
         entry_path = PolylinePath(self.entry_pts)
         for k in range(14):
             d = (k * 45.0 + t * 42.0) % entry_path.total_length
             pos, tang, norm = entry_path.sample(d)
-            draw_person_topdown(draw, pos[0], pos[1], radius=4.8, holding_flower=True)
+            pid = 200 + k
+            draw_person_topdown(overlay, pos[0], pos[1], radius=4.8, holding_flower=True,
+                                heading=(tang[0], tang[1]), person_id=pid, phase=t * 7.5 + pid * 0.6)
 
         # Draw 4-abreast rows walking along the tent-front feeder toward the left collection corner
         for k in range(10):
@@ -345,7 +320,9 @@ class Scene1Plan:
             pos, tang, norm = self.feeder_path.sample(d)
             for lane in range(4):
                 pt = pos + norm * ((lane - 1.5) * 7.0 * self.sx)
-                draw_person_topdown(draw, pt[0], pt[1], radius=4.8, holding_flower=True)
+                pid = 300 + k * 4 + lane
+                draw_person_topdown(overlay, pt[0], pt[1], radius=4.8, holding_flower=True,
+                                    heading=(tang[0], tang[1]), person_id=pid, phase=t * 7.5 + pid * 0.6)
 
         # Draw rows of 4 people (แถวตอนเรียง 4) walking from the domes along the main walkway to ซุ้มถวายดอกไม้จันทน์!
         row_spacing = 24.0
@@ -362,12 +339,19 @@ class Scene1Plan:
                 is_front_offering = (self.main_total - d) < 18.0
                 for lane in range(4):
                     pt = self.sample_4abreast_main(d, lane)
-                    draw_person_topdown(draw, pt[0], pt[1], radius=5.2, holding_flower=True, highlight=is_front_offering)
+                    _, tang, _ = self._sample_main(d, "up" if lane < 2 else "low")
+                    pid = 400 + r * 4 + lane
+                    draw_person_topdown(overlay, pt[0], pt[1], radius=5.2, holding_flower=True,
+                                        highlight=is_front_offering, heading=(tang[0], tang[1]),
+                                        person_id=pid, phase=t * 7.5 + pid * 0.6)
 
         # Representative completed-offering queue covering the entire exit loop (stage edge -> front boundary -> left exit)
-        for d, pts in self.sample_exit_rows(t):
-            for pt in pts:
-                draw_person_topdown(draw, pt[0], pt[1], radius=4.8, holding_flower=False)
+        for r_i, (d, pts) in enumerate(self.sample_exit_rows(t)):
+            _, tang, _ = self.exit_path.sample(d)
+            for lane, pt in enumerate(pts):
+                pid = 600 + r_i * 4 + lane
+                draw_person_topdown(overlay, pt[0], pt[1], radius=4.8, holding_flower=False,
+                                    heading=(tang[0], tang[1]), person_id=pid, phase=t * 7.5 + pid * 0.6)
 
         # Glowing pulse at the ซุ้มถวายดอกไม้จันทน์ / พานพุ่ม when rows arrive
         pulse = 0.5 + 0.5 * math.sin(t * 6.0)
@@ -388,8 +372,7 @@ class Scene1Plan:
         sx_r, sy_r = self.tr(1140, 763)
         draw_badge(draw, int(sx_r - 135), int(sy_r + 55), "แยกอ้อมวงเวียนตามลูกศร แล้วรวมแถวเรียง 4", bg=(15, 23, 42, 230), border=(250, 204, 21, 255), font=F_SMALL_B)
 
-        sx_p, sy_p = self.tr(1585, 763)
-        draw_badge(draw, int(sx_p - 120), int(sy_p - 115), "4. วางดอกไม้จันทน์ที่พานพุ่ม\n    หน้าซุ้มถวายดอกไม้จันทน์", bg=(146, 64, 14, 245), border=(253, 224, 71, 255))
+        draw_badge(draw, 1400, 480, "4. ถวายดอกไม้จันทน์ที่พานพุ่ม\n   เสร็จแล้วเดินออกด้านซ้ายทันที", bg=(146, 64, 14, 245), border=(253, 224, 71, 255))
 
         sx_out, sy_out = self.tr(380, 310)
         draw_badge(draw, int(sx_out - 20), int(sy_out - 58), "5. ทางออก: ออกด้านซ้ายของซุ้ม วนเลียบขอบเวทีและแนวด้านหน้า", bg=(185, 28, 28, 240), border=(255, 255, 255, 255))
@@ -413,7 +396,10 @@ class Scene1Plan:
             rx = wx1 + 80 + ((r_idx * 54 + int(t * 45)) % (wx2 - wx1 - 95))
             for lane in range(4):
                 ly = wy1 + 26 + lane * 42
-                draw_person_topdown(draw, rx, ly, radius=8.5, holding_flower=True, highlight=(rx > wx2 - 55))
+                pid = 800 + r_idx * 4 + lane
+                draw_person_topdown(overlay, rx, ly, radius=8.5, holding_flower=True,
+                                    highlight=(rx > wx2 - 55), heading=(1.0, 0.0),
+                                    person_id=pid, phase=t * 7.5 + pid * 0.6)
         # Draw 4 Golden Trays (พานพุ่ม) at the right side of the mini-diagram
         draw.rounded_rectangle([wx2 + 10, wy1, bx2 - 16, wy2], radius=8, fill=(120, 53, 15, 220), outline=(250, 204, 21, 255), width=2)
         draw.text((wx2 + 18, wy1 + 8), "พานพุ่ม", font=F_SMALL_B, fill=(254, 240, 138, 255))
@@ -564,11 +550,16 @@ class Scene2IsoOverview:
         draw_red_arrow_polyline(draw, self.exit_pts, width=6, color=(220, 38, 38, 220), arrow_spacing=75, phase_offset=phase)
 
         # Draw seated people clusters at the tent fronts (near the entry branches and feeder start)
-        for (dx, dy) in [(600, 318), (640, 340), (360, 415), (400, 432), (555, 355), (660, 285)]:
+        for g_i, (dx, dy) in enumerate([(600, 318), (640, 340), (360, 415), (400, 432), (555, 355), (660, 285)]):
             bx, by = self.tr(dx, dy)
             for r in range(3):
                 for c in range(4):
-                    draw_person_3d_iso(draw, bx + c*11 - r*8, by + r*9 + c*5, scale=0.72, holding_flower=True)
+                    draw_person_3d_iso(overlay, bx + c*11 - r*8, by + r*9 + c*5, scale=0.72,
+                                       holding_flower=True, state="seated",
+                                       person_id=g_i * 20 + r * 4 + c)
+
+        # Collect all walkers for a far-to-near depth sort (overlapping bodies composite correctly)
+        people = []
 
         # Feeder rows: 4-abreast walking along the tent fronts toward the left collection corner
         for k in range(12):
@@ -576,8 +567,8 @@ class Scene2IsoOverview:
             pos, tang, norm = self.feeder_path.sample(d)
             for lane in range(4):
                 pt = pos + norm * ((lane - 1.5) * 7.0 * self.sx)
-                draw_person_3d_iso(draw, pt[0], pt[1], scale=0.9, holding_flower=True,
-                                   facing_dir=(tang[0], tang[1]))
+                pid = 200 + k * 4 + lane
+                people.append((pt[1], pt[0], 0.9, True, (tang[0], tang[1]), False, pid))
 
         # Draw 4-abreast procession: prefix -> 2+2 around fountain -> offering -> exit chain
         row_spacing = 23.0
@@ -588,15 +579,21 @@ class Scene2IsoOverview:
                 near_offering = (self.main_total - d) < 22.0
                 for lane in range(4):
                     pt, tang = self.sample_4abreast(d, lane)
-                    draw_person_3d_iso(draw, pt[0], pt[1], scale=0.95, holding_flower=True,
-                                       facing_dir=(tang[0], tang[1]), bowing=near_offering)
+                    pid = 100 + r * 4 + lane
+                    people.append((pt[1], pt[0], 0.95, True, (tang[0], tang[1]), near_offering, pid))
 
         # Representative completed-offering queue covering the entire exit loop
         # (left of shrine -> backdrop edge -> front boundary -> left exit)
-        for d, pts in self.sample_exit_rows(t):
-            for pt, tang in pts:
-                draw_person_3d_iso(draw, pt[0], pt[1], scale=0.88, holding_flower=False,
-                                   facing_dir=(tang[0], tang[1]))
+        for r_i, (d, pts) in enumerate(self.sample_exit_rows(t)):
+            for lane, (pt, tang) in enumerate(pts):
+                pid = 300 + r_i * 4 + lane
+                people.append((pt[1], pt[0], 0.88, False, (tang[0], tang[1]), False, pid))
+
+        people.sort(key=lambda p: p[0])
+        for py_f, px_f, sc, flower, facing, bowing, pid in people:
+            draw_person_3d_iso(overlay, px_f, py_f, scale=sc, holding_flower=flower,
+                               facing_dir=facing, bowing=bowing,
+                               person_id=pid, phase=t * 7.5 + pid * 0.6)
 
         # Golden glow at the ซุ้มถวายดอกไม้จันทน์ offering point (744, 343)
         px, py = self.tr(744, 343)
@@ -639,8 +636,25 @@ class Scene3AxialView:
         self.tr = tr
         # Tent-front feeder toward the near/bottom-left collection corner (turn is off-camera)
         self.feeder_native = [(430, 315), (390, 410), (345, 535), (300, 660), (276, 715)]
-        # Visible initial LEFT exit past the upper-left flowerbed only
-        self.exit_native = [(638, 272), (535, 272), (500, 255), (510, 242)]
+        # Full exit chain: initial LEFT past the upper-left flowerbed, then behind the
+        # shrine along the stage front and DOWN the right white walkway toward camera
+        self.exit_native = [(638, 272), (535, 272), (500, 255), (510, 242),
+                            (750, 242), (774, 280), (820, 350), (882, 450),
+                            (918, 500), (983, 600), (1060, 715)]
+        self.exit_path = PolylinePath([self.tr(x, y) for x, y in self.exit_native])
+
+    def sample_exit_rows(self, t):
+        # Completed-offering walkers returning 4-abreast down the right corridor,
+        # populated over the whole loop from t=0 (illustrative, not a count model)
+        count = max(16, int(self.exit_path.total_length / 55.0))
+        rows = []
+        for r in range(count):
+            d = (r / count * self.exit_path.total_length + t * 58.0) % self.exit_path.total_length
+            pos, tang, norm = self.exit_path.sample(d)
+            sc = 0.65 + (pos[1] / H) * 0.55
+            pts = [(pos + norm * ((lane - 1.5) * 7.0 * sc), tang) for lane in range(4)]
+            rows.append((d, pts))
+        return rows
 
     def render(self, t, total_progress):
         # t in [0, 14] seconds
@@ -661,17 +675,21 @@ class Scene3AxialView:
         right_walk = [self.tr(x, y) for x, y in [
             (656, 715), (656, 522), (710, 492), (716, 464), (690, 434), (648, 418), (646, 272)
         ]]
-        # Exit: only the visible initial portion LEFT of the shrine past the upper-left flowerbed
-        exit_left = [self.tr(x, y) for x, y in self.exit_native]
+        # Exit: LEFT of shrine, behind it, then down the right white walkway toward camera
+        exit_full = [self.tr(x, y) for x, y in self.exit_native]
         draw_red_arrow_polyline(draw, left_walk, width=6, color=(220, 38, 38, 230), arrow_spacing=70, phase_offset=phase)
         draw_red_arrow_polyline(draw, right_walk, width=6, color=(220, 38, 38, 230), arrow_spacing=70, phase_offset=phase)
-        draw_red_arrow_polyline(draw, exit_left, width=6, color=(220, 38, 38, 225), arrow_spacing=75, phase_offset=phase)
+        draw_red_arrow_polyline(draw, exit_full, width=6, color=(220, 38, 38, 225), arrow_spacing=75, phase_offset=phase)
 
         # Seated people under the left domes (x=40..330, y=380..505)
         for r in range(5):
             for c in range(7):
                 px, py = self.tr(65 + c * 34 - r * 12, 395 + r * 22)
-                draw_person_3d_iso(draw, px, py, scale=0.85 + r * 0.05, holding_flower=True, facing_dir=(0.6, 0.5))
+                draw_person_3d_iso(overlay, px, py, scale=0.85 + r * 0.05, holding_flower=True,
+                                   facing_dir=(0.6, 0.5), state="seated", person_id=r * 7 + c)
+
+        # Collect walkers for a far-to-near depth sort so overlapping bodies composite correctly
+        people = []
 
         # People walking 4-abreast along the tent-front feeder path
         feeder_path = PolylinePath(feeder_pts)
@@ -681,7 +699,8 @@ class Scene3AxialView:
             for lane in range(4):
                 pt = pos + norm * ((lane - 1.5) * 8.5)
                 sc = 0.95 + (pt[1] / H) * 0.45
-                draw_person_3d_iso(draw, pt[0], pt[1], scale=sc, holding_flower=True, facing_dir=(tang[0], tang[1]))
+                pid = 200 + k * 4 + lane
+                people.append((pt[1], pt[0], sc, True, (tang[0], tang[1]), False, pid))
 
         # People marching up the central walkway in 4-abreast formation (แถวตอนเรียง 4)
         # Follow left_walk for lanes 0,1 and right_walk for lanes 2,3 so no one steps on the roundabout flowerbed!
@@ -701,19 +720,31 @@ class Scene3AxialView:
                     pos, tang, norm = right_path.sample(s * right_path.total_length)
                     offset = (-8.5 if lane == 2 else 8.5) * (1.0 - s * 0.45)
                 pt = pos + norm * offset
-                draw_person_3d_iso(draw, pt[0], pt[1], scale=sc, holding_flower=True,
-                                   facing_dir=(0.0, -1.0), bowing=near_top)
+                pid = 300 + r * 4 + lane
+                # Bodies turn with the actual walkway tangent (was fixed north before)
+                people.append((pt[1], pt[0], sc, True, (tang[0], tang[1]), near_top, pid))
 
-        # People exiting LEFT of the ซุ้มถวายดอกไม้จันทน์ (only the visible initial portion;
-        # the perimeter continuation is outside this camera)
-        exit_path = PolylinePath(exit_left)
-        for k in range(10):
-            d = (k * 55.0 + t * 58.0) % exit_path.total_length
-            pos, tang, norm = exit_path.sample(d)
-            sc = 0.65 + (pos[1] / H) * 0.55
-            for sub in (-1, 1):
-                pt = pos + norm * (sub * 7.0 * sc)
-                draw_person_3d_iso(draw, pt[0], pt[1], scale=sc, holding_flower=False, facing_dir=(tang[0], tang[1]))
+        # Completed-offering walkers exiting LEFT of the shrine then returning DOWN
+        # the right white corridor (full chain populated from t=0)
+        for r_i, (d, pts) in enumerate(self.sample_exit_rows(t)):
+            sc = 0.65 + (pts[0][0][1] / H) * 0.55
+            for lane, (pt, tang) in enumerate(pts):
+                pid = 400 + r_i * 4 + lane
+                people.append((pt[1], pt[0], sc, False, (tang[0], tang[1]), False, pid))
+
+        people.sort(key=lambda p: p[0])
+        for py_f, px_f, sc, flower, facing, bowing, pid in people:
+            draw_person_3d_iso(overlay, px_f, py_f, scale=sc, holding_flower=flower,
+                               facing_dir=facing, bowing=bowing,
+                               person_id=pid, phase=t * 7.5 + pid * 0.6)
+
+        # Foreground occlusion seam: the shrine monument itself stays in front of
+        # the behind-shrine return segment — clear overlay (people+arrows) inside
+        # the monument silhouette so the original B-13 statue/steps show through
+        draw.polygon([self.tr(x, y) for x, y in [
+            (624, 178), (648, 178), (666, 213), (667, 246),
+            (676, 268), (604, 268), (612, 245), (612, 213)
+        ]], fill=(0, 0, 0, 0))
 
         # Callout badges
         b1 = self.tr(180, 355)
@@ -721,13 +752,14 @@ class Scene3AxialView:
 
         draw_badge(draw, 24, 720, "2. รวมแถวด้านซ้ายของเต็นท์\n   จุดเลี้ยวอยู่นอกมุมภาพ\n   เดินแถวตอนเรียง 4", bg=(185, 28, 28, 240), border=(253, 224, 71, 255))
 
-        b3 = self.tr(638, 468)
-        draw_badge(draw, int(b3[0] + 135), int(b3[1] - 20), "3. แยกอ้อมวงเวียน ซ้าย 2 แถว / ขวา 2 แถว\n    แล้วรวมกลับเป็นแถวตอนเรียง 4", bg=(15, 23, 42, 235), border=(250, 204, 21, 255))
+        draw_badge(draw, 1470, 710, "3. อ้อมวงเวียน 2+2\n   แล้วรวมแถวเรียง 4", bg=(15, 23, 42, 235), border=(250, 204, 21, 255))
 
         b4 = self.tr(640, 220)
         draw_badge(draw, int(b4[0] - 155), int(b4[1] - 95), "4. วางดอกไม้จันทน์ที่พานพุ่มหน้าซุ้มฯ (ครั้งละ 4 คน)", bg=(146, 64, 14, 245), border=(253, 224, 71, 255))
 
-        draw_badge(draw, 1260, 200, "5. ออกด้านซ้ายของซุ้ม\n   วนเลียบขอบเวที (ดูภาพรวม)", bg=(22, 101, 52, 235), border=(134, 239, 172, 255))
+        draw_badge(draw, 1260, 200, "5. ออกด้านซ้าย แล้ววนกลับฝั่งขวา\n   เดินกลับเป็นแถวตอนเรียง 4", bg=(22, 101, 52, 235), border=(134, 239, 172, 255))
+
+        draw_badge(draw, 1500, 830, "เดินกลับเรียง 4 หลังถวายฯ", bg=(185, 28, 28, 240), border=(253, 224, 71, 255), font=F_SMALL_B)
 
         draw_top_header(
             draw,
@@ -771,70 +803,18 @@ class Scene4CloseUpOffering:
                     people.append((k, lane, x, 438.0 + (lane - 1.5) * 2.0))
         return people
 
-    def draw_close_person(self, draw, x, y, scale, state="walking", walk_phase=0.0, col_num=1):
+    def draw_close_person(self, canvas, x, y, scale, state="walking", walk_phase=0.0,
+                          person_id=0, offer_progress=0.0):
         """
         state: 'walking' (back view walking toward pavilion),
                'offering' (bowing & extending arms to place sandalwood flower on พานพุ่ม),
-               'exiting' (walking left toward exit)
+               'exiting' (walking left toward exit), 'idle' (queued, standing)
         """
-        x, y = float(x), float(y)
-        bob = abs(math.sin(walk_phase)) * 4.5 * scale if state != "offering" else 0.0
-        bow_drop = 8.0 * scale if state == "offering" else 0.0
-
-        # Ground shadow
-        sw, sh = 26 * scale, 9 * scale
-        draw.ellipse([x - sw, y - sh, x + sw, y + sh], fill=(0, 0, 0, 125))
-
-        # Legs
-        leg_h = 38 * scale
-        leg_w = max(3, int(8 * scale))
-        step_l = math.sin(walk_phase) * 6 * scale if state != "offering" else 0.0
-        step_r = -step_l
-        draw.line([(x - 8*scale, y - 2*scale + step_l*0.4), (x - 8*scale, y - leg_h)],
-                  fill=(18, 22, 32, 255), width=leg_w)
-        draw.line([(x + 8*scale, y - 2*scale + step_r*0.4), (x + 8*scale, y - leg_h)],
-                  fill=(18, 22, 32, 255), width=leg_w)
-
-        # Torso (Formal black mourning suit/dress)
-        torso_h = 46 * scale - bow_drop * 0.5
-        torso_w = 22 * scale
-        t_top = y - leg_h - torso_h + bob + bow_drop
-        t_bot = y - leg_h + bob + 4*scale
-        draw.rounded_rectangle([x - torso_w, t_top, x + torso_w, t_bot],
-                               radius=max(4, int(8 * scale)),
-                               fill=(15, 20, 30, 255), outline=(226, 232, 240, 210), width=max(1, int(2*scale)))
-
-        # Arms & Sandalwood flower (ดอกไม้จันทน์)
-        if state == "offering":
-            # Extending hands forward/up toward the พานพุ่ม with golden sandalwood flower!
-            fx, fy = x, t_top - 10 * scale
-            draw.line([(x - torso_w*0.8, t_top + 12*scale), (fx - 4*scale, fy)],
-                      fill=(25, 30, 42, 255), width=max(2, int(6*scale)))
-            draw.line([(x + torso_w*0.8, t_top + 12*scale), (fx + 4*scale, fy)],
-                      fill=(25, 30, 42, 255), width=max(2, int(6*scale)))
-            # Glowing Sandalwood Flower being placed
-            fr = max(5, int(9 * scale))
-            draw.ellipse([fx - fr - 3, fy - fr - 3, fx + fr + 3, fy + fr + 3], fill=(250, 204, 21, 140))
-            draw.ellipse([fx - fr, fy - fr, fx + fr, fy + fr], fill=(254, 240, 138, 255), outline=(217, 119, 6, 255), width=2)
-        elif state == "walking":
-            # Holding sandalwood flower at chest/front
-            fx, fy = x + 14*scale, t_top + 16*scale
-            fr = max(4, int(6.5 * scale))
-            draw.ellipse([fx - fr, fy - fr, fx + fr, fy + fr], fill=(250, 204, 21, 255), outline=(180, 83, 9, 255), width=1)
-
-        # Head (Back of head with neat dark hair)
-        r_head = 13.5 * scale
-        head_x = x - (4*scale if state == "exiting" else 0.0)
-        head_y = t_top - r_head * 0.85 + (4*scale if state == "offering" else 0.0)
-        draw.ellipse([head_x - r_head, head_y - r_head, head_x + r_head, head_y + r_head],
-                     fill=(28, 30, 38, 255), outline=(255, 255, 255, 180), width=max(1, int(1.5*scale)))
-
-        # Column badge on back of front rows so audience clearly sees "แถวตอนเรียง 4 (คนที่ 1..4)"
-        if scale > 0.72 and state == "walking":
-            bw = int(15 * scale)
-            draw.ellipse([x - bw, t_top + 18*scale - bw, x + bw, t_top + 18*scale + bw],
-                         fill=(185, 28, 28, 235), outline=(253, 224, 71, 255), width=2)
-            draw.text((x - 5*scale, t_top + 18*scale - 10*scale), str(col_num), font=F_SMALL_B, fill=(255, 255, 255, 255))
+        heading = (-1.0, 0.0) if state == "exiting" else (0.0, -1.0)
+        st = "walking" if state == "exiting" else state
+        draw_human(canvas, x, y, 116.0 * scale, heading=heading, phase=walk_phase,
+                   state=st, person_id=person_id, holding_flower=(state != "exiting"),
+                   camera="close", offer_progress=offer_progress)
 
     def render(self, t, total_progress):
         # t in [0, 16] seconds
@@ -895,7 +875,8 @@ class Scene4CloseUpOffering:
         # Draw departed cohorts walking off to the LEFT along (y=438) - continuous across cycle boundaries
         for coh, lane, ex, ey in self.exit_people_native(t):
             px, py = self.tr(ex, ey)
-            self.draw_close_person(draw, px, py, scale=0.52, state="exiting", walk_phase=t * 9.0 + lane, col_num=lane + 1)
+            self.draw_close_person(overlay, px, py, scale=0.52, state="exiting",
+                                   walk_phase=t * 9.0 + lane, person_id=coh * 4 + lane)
 
         # Draw the rows of 4 people (แถวตอนเรียง 4) from back to front (painter's algorithm: far y first, near y last!)
         # Row 0 is the front-most row at the offering line (y_orig = 438), Row 5 is at the bottom (y_orig = 700)
@@ -922,21 +903,33 @@ class Scene4CloseUpOffering:
             for lane in range(4):
                 x_orig = cols_top[lane] * (1.0 - p_s) + cols_bot[lane] * p_s
                 st = "walking"
+                offer_prog = 0.0
                 if r == 0:
                     if front_state == "offering":
                         st = "offering"
-                        # Animate golden flower floating from hands onto the tray!
+                        offer_prog = (cycle_u - 0.45) / 0.35
+                        # Small cream sandalwood flower drifting from hands onto the tray
                         px_t, py_t = self.tr(cols_top[lane], 396)
                         px_h, py_h = self.tr(x_orig, y_orig)
-                        offer_sub = (cycle_u - 0.45) / 0.35
+                        offer_sub = offer_prog
                         fx = px_h * (1.0 - offer_sub) + px_t * offer_sub
                         fy = (py_h - 42*scale) * (1.0 - offer_sub) + py_t * offer_sub
-                        draw.ellipse([fx - 7, fy - 7, fx + 7, fy + 7], fill=(254, 240, 138, 255), outline=(217, 119, 6, 255), width=2)
+                        for pet in range(5):
+                            ang = pet * (2 * math.pi / 5) - math.pi / 2
+                            pxf, pyf = fx + 2.2 * math.cos(ang), fy + 2.2 * math.sin(ang)
+                            draw.ellipse([pxf - 1.4, pyf - 1.4, pxf + 1.4, pyf + 1.4],
+                                         fill=(254, 244, 200, 255))
+                        draw.ellipse([fx - 1.6, fy - 1.6, fx + 1.6, fy + 1.6],
+                                     fill=(217, 119, 6, 255))
                     elif front_state == "exiting":
                         st = "exiting"
+                elif front_state != "walking":
+                    st = "idle"  # queued rows stand still while the front row offers/exits
                 px, py = self.tr(x_orig, y_orig)
                 walk_ph = (t * 8.5 + lane * 0.4 + r * 0.7) if (cycle_u < 0.45 or st == "exiting") else 0.0
-                self.draw_close_person(draw, px, py, scale=scale, state=st, walk_phase=walk_ph, col_num=lane + 1)
+                pid = (cycle_idx + r) * 4 + lane
+                self.draw_close_person(overlay, px, py, scale=scale, state=st, walk_phase=walk_ph,
+                                       person_id=pid, offer_progress=offer_prog)
 
         # Picture-in-Picture Reference Box (Top-Right) showing 1791968512941.jpg (แบบซุ้มถวายดอกไม้จันทน์และพานพุ่ม)
         ix, iy = W - 446, 108
@@ -982,16 +975,15 @@ def main():
     s4 = Scene4CloseUpOffering()
 
     # Save 4 preview PNG frames first so we can visually inspect every scene!
-    s1.render(6.0, 0.15).save(os.path.join(PIC_DIR, "_preview_s1.png"))
-    s2.render(5.0, 0.40).save(os.path.join(PIC_DIR, "_preview_s2.png"))
-    s3.render(5.0, 0.65).save(os.path.join(PIC_DIR, "_preview_s3.png"))
-    s4.render(2.4, 0.88).save(os.path.join(PIC_DIR, "_preview_s4.png"))
+    s1.render(6.0, 6.0 / 40.0).save(os.path.join(PIC_DIR, "_preview_s1.png"))
+    s2.render(5.0, 15.0 / 40.0).save(os.path.join(PIC_DIR, "_preview_s2.png"))
+    s3.render(5.0, 23.0 / 40.0).save(os.path.join(PIC_DIR, "_preview_s3.png"))
+    s4.render(2.4, 30.4 / 40.0).save(os.path.join(PIC_DIR, "_preview_s4.png"))
     print("Saved preview frames _preview_s1..s4.png")
 
-    # Duration per scene:
-    # Scene 1: 16s, Scene 2: 14s, Scene 3: 14s, Scene 4: 16s -> Total = 60 seconds (1800 frames @ 30fps)
-    d1, d2, d3, d4 = 16.0, 14.0, 14.0, 16.0
-    total_dur = d1 + d2 + d3 + d4
+    # Duration per scene: 10s + 8s + 10s + 12s -> 40 seconds (1200 frames @ 30fps)
+    d1, d2, d3, d4 = SCENE_DURATIONS
+    total_dur = TOTAL_DURATION
     total_frames = int(total_dur * FPS)
 
     ffmpeg_exe = r"C:\Users\admin\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1.2-full_build\bin\ffmpeg.exe"
